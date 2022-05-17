@@ -1,4 +1,4 @@
-# SURDS: Self-Supervised Attention-guided Reconstruction and Dual Triplet Loss for Writer Independent Offline Signature Verification, ICPR 2022.
+## SURDS: Self-Supervised Attention-guided Reconstruction and Dual Triplet Loss for Writer Independent Offline Signature Verification, ICPR 2022.
 
 **Soumitri Chattopadhyay**, Siladittya Manna, Saumik Bhattacharya and Umapada Pal, [**"SURDS: Self-Supervised Attention-guided Reconstruction and Dual Triplet Loss for Writer Independent Offline Signature Verification"**](https://arxiv.org/abs/2201.10138), _26th International Conference on Pattern Recognition_ **(ICPR)**, 2022.
 
