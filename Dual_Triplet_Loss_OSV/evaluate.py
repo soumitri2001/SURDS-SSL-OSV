@@ -8,6 +8,7 @@ import torch
 from torch.nn.functional import mse_loss
 from torchvision.utils import save_image
 import random
+import json
 # from sklearn_extra.cluster import KMedoids
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
@@ -58,7 +59,7 @@ def compute_accuracy_roc(predictions, labels, step=None):
 
         acc = 0.5 * (tpr + tnr)
         
-        print(f"Threshold = {d} | Accuracy = {acc:.4f}")
+        # print(f"Threshold = {d} | Accuracy = {acc:.4f}")
 
         if acc > max_acc:
             max_acc = acc
@@ -73,13 +74,13 @@ def compute_accuracy_roc(predictions, labels, step=None):
     return metrics, d_optimal
 
 
-def plot_roc(tpr, fpr):
+def plot_roc(tpr, fpr, fname):
     assert len(tpr) == len(fpr)
     plt.plot(fpr, tpr, marker='.')
     plt.plot(fpr, fpr, linestyle='--')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.savefig("./ROC_H2B.png", dpi=300)
+    plt.savefig(f"./ROC_{fname}.png", dpi=300)
     
 if __name__ == '__main__':
 
@@ -98,7 +99,10 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_epochs', type=int, default=20)
     parser.add_argument('--max_epochs', type=int, default=200)
     parser.add_argument('--model_path', type=str, default='./saved_models/BHSig260_Bengali_200epochs_LR=0.1_LR-AE=0.0001_LBD=1.0_backbone=AE.pt')
-    parser.add_argument('--stepsize', type=float, default=0.0005)
+    parser.add_argument('--stepsize', type=float, default=5e-5)
+    parser.add_argument('--eval_type', type=str, default='self', choices=['self','cross'])
+    parser.add_argument('--roc', type=bool, default=False)
+    parser.add_argument('--roc_name', type=str, default=None)
     args = parser.parse_args()
 
     print('\n'+'*'*100)
@@ -122,20 +126,21 @@ if __name__ == '__main__':
     mean_AP, mean_AN = 0.0, 0.0
 
     with torch.no_grad():
-        for batch in train_loader:
-            feat = model.projector(model.encoder(batch['anchor'].to(device), pool=True))
-            # P_feat = model.projector(model.encoder(batch['positive'].to(device), pool=True))
-            # N_feat = model.projector(model.encoder(batch['negative_intra'].to(device), pool=True))
-            # mean_AP += np.abs(np.mean(np.subtract(feat.cpu().numpy(), P_feat.cpu().numpy())))
-            # mean_AN += np.abs(np.mean(np.subtract(feat.cpu().numpy(), N_feat.cpu().numpy())))
-            features.append(feat.cpu().numpy())
-            labels.append(batch['label'].cpu().numpy())
-            writer_ids.append(int(batch['writer_id'][0]))
-            img_names.append(batch['img_name'][0])
-        # mean_AP /= len(train_loader)
-        # mean_AN /= len(train_loader)
-        # print(len(features), len(labels), len(writer_ids))
-        # print(f"Train set: Mean A--P distance = {mean_AP} | Mean A--N distance = {mean_AN}")
+        if args.eval_type == 'cross':
+            for batch in train_loader:
+                feat = model.projector(model.encoder(batch['anchor'].to(device), pool=True))
+                # P_feat = model.projector(model.encoder(batch['positive'].to(device), pool=True))
+                # N_feat = model.projector(model.encoder(batch['negative_intra'].to(device), pool=True))
+                # mean_AP += np.abs(np.mean(np.subtract(feat.cpu().numpy(), P_feat.cpu().numpy())))
+                # mean_AN += np.abs(np.mean(np.subtract(feat.cpu().numpy(), N_feat.cpu().numpy())))
+                features.append(feat.cpu().numpy())
+                labels.append(batch['label'].cpu().numpy())
+                writer_ids.append(int(batch['writer_id'][0]))
+                img_names.append(batch['img_name'][0])
+            # mean_AP /= len(train_loader)
+            # mean_AN /= len(train_loader)
+            # print(len(features), len(labels), len(writer_ids))
+            # print(f"Train set: Mean A--P distance = {mean_AP} | Mean A--N distance = {mean_AN}")
         for batch in test_loader:
             feat = model.projector(model.encoder(batch['image'].to(device), pool=True))
             features.append(feat.cpu().numpy())
@@ -220,91 +225,10 @@ if __name__ == '__main__':
     print(f"FRR: {metrics['best_frr'] * 100 :.4f} %")
     print('-'*50)
 
-    plot_roc(metrics['tpr_arr'], metrics['far_arr'])
-
-############################################################################################################
-    # eval metrics ##
-    # y_true, y_pred = np.array(preds['y_true']), np.array(preds['y_pred'])
-    # accuracy = np.sum(y_pred == y_true)/y_true.shape[0]
-    # print(f'Accuracy using THRESHOLD = {THRESHOLD}: {accuracy:.6f}')
-
-    # trues = 0
-    # for i in range(len(preds)):
-    #     if preds['y_true'][i] == 1 and preds['y_pred'][i] == 1:
-    #         trues += 1
-    # print(f"Correctly preds True: {trues}")
-
-    # preds.to_csv("./saved_models/preds.csv", index=False)
-#############################################################################################################
-
-
-    # 4. train a KNN classifier
-    # cls = SVM() # if args.cls.upper() == 'SVM' else KNN()
-    # cls.fit(X_train, y_train)
-    # y_pred = cls.predict(X_test)
-    # accuracy = np.sum(y_pred == y_test)/y_test.shape[0]
-    # print(f'Accuracy using SVM classifier: {accuracy:.6f}')
-
-
-    # # 5. plot tsne
-    # tsne = TSNE(n_components=2, perplexity=50, random_state=0)
-
-    # X_train_tsne = tsne.fit_transform(X_train)
-    # X_test_tsne = tsne.fit_transform(X_test)
-
-    # plt.figure(figsize=(16,16))
-    # sns.scatterplot(
-    #             x=X_train_tsne[:,0], y=X_train_tsne[:,1],
-    #             # hue=np.array(y_train),            
-    #             # palette=sns.color_palette(["Red", "Blue"], 2),
-    #             hue=Wid_train,
-    #             palette=sns.color_palette("bright", np.unique(Wid_train).shape[0]),
-    #             legend="full",
-    #             alpha=0.5,
-    #         )
-    # plt.savefig(f"./saved_models/DualTriplet_train_tsne_SigNet_WriterWise_LR=0.0001.png", dpi=300)
-
-    # plt.clf()
-
-    # plt.figure(figsize=(16,16))
-    # sns.scatterplot(
-    #             x=X_test_tsne[:,0], y=X_test_tsne[:,1],
-    #             # hue=np.array(y_test),  
-    #             # palette=sns.color_palette(["Red", "Blue"], 2),          
-    #             hue=Wid_test,
-    #             palette=sns.color_palette("bright", np.unique(Wid_test).shape[0]),
-    #             legend="full",
-    #             alpha=0.5,
-    #         )
-    # plt.savefig(f"./saved_models/DualTriplet_test_tsne_SigNet_WriterWise_LR=0.0001.png", dpi=300)
-
-
-    # K-medoids
-    # cls = KMedoids(n_clusters=30, random_state=0)
-    # kmeds = cls.fit(X_test)
-
-    # med_indices = kmeds.medoid_indices_
-    # medoid_imgs = list(Wid_test[med_indices])
-    # medoid_imgs.sort()
-    # medoid_imgs = pd.DataFrame(medoid_imgs)
-    # medoid_imgs.to_csv(f"./saved_models/WriterWise_SigNet_Clusters_MedoidImages.csv", index=False)
-
-    # clusters = kmeds.predict(X)
-    # plt.figure(figsize=(16,16))
-    # sns.scatterplot(
-    #     x=X_test_tsne[:,0], y=X_test_tsne[:,1],
-    #     hue=np.array(clusters),
-    #     palette=sns.color_palette("hls", N),
-    #     legend="full",
-    #     alpha=0.5,
-    # )
-    # plt.savefig(f"./saved_figures/{args.algo}_N={N}.jpg", dpi=300)
-
-
-
-
-
-
-
-
+    if args.roc is True:
+        if args.roc_name is None:
+            args.roc_name = f"{os.path.basename(args.dataset)}_{args.eval_type}_{os.path.basename(args.model_path)}"
+            with open(f"logs/{args.roc_name}.json", "w") as outfile:
+                json.dump(metrics, outfile)
+        #  plot_roc(metrics['tpr_arr'], metrics['far_arr'], fname=args.roc_name)
 
